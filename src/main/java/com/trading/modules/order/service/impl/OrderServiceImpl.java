@@ -39,7 +39,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
-        // Phase 5: Distributed Validation
         marketConfigService.validateMarket(request.getSymbol());
 
         Order order = orderMapper.toEntity(request);
@@ -47,10 +46,6 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
 
         OrderCreatedEvent event = orderMapper.toEvent(savedOrder);
-
-        // Phase 5: Partitioned Scaling - Symbol as the Kafka Key
-        // This ensures orders for the same symbol are always processed in sequence by
-        // the same engine instance
         eventPublisher.publish("order.created", event.getSymbol(), event);
 
         return orderMapper.toResponse(savedOrder);
