@@ -1,73 +1,67 @@
 package com.trading.modules.order.service.impl;
 
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.trading.infrastructure.kafka.producer.EventPublisher;
+import com.trading.modules.market.service.MarketConfigService;
 import com.trading.modules.order.dao.OrderRepository;
 import com.trading.modules.order.dto.CreateOrderRequest;
-import com.trading.modules.order.model.Order;
-import com.trading.modules.order.service.OrderService;
-import com.trading.shared.event.OrderCreatedEvent;
-import com.trading.modules.order.model.OrderStatus;
-
-import lombok.RequiredArgsConstructor;
-
 import com.trading.modules.order.dto.OrderResponse;
 import com.trading.modules.order.mapper.OrderMapper;
+import com.trading.modules.order.model.Order;
+import com.trading.modules.order.model.OrderStatus;
+import com.trading.modules.order.service.OrderService;
+import com.trading.shared.event.OrderCreatedEvent;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
-    private final OrderRepository repository;
-    private final EventPublisher publisher;
-    private final OrderMapper mapper;
+    private final OrderRepository orderRepository;
+    private final OrderMapper orderMapper;
+    private final EventPublisher eventPublisher;
+    private final MarketConfigService marketConfigService;
 
     @Override
     public List<OrderResponse> getOrdersByUserId(UUID userId) {
-        return repository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(mapper::toResponse)
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(orderMapper::toResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public OrderResponse createOrder(CreateOrderRequest req) {
+    public OrderResponse createOrder(CreateOrderRequest request) {
+        // Phase 5: Distributed Validation
+        marketConfigService.validateMarket(request.getSymbol());
 
-        Order order = new Order();
-        order.setUserId(req.getUserId());
-        order.setSymbol(req.getSymbol());
-        order.setType(req.getType());
-        order.setSide(req.getSide());
-        order.setPrice(req.getPrice());
-        order.setQuantity(req.getQuantity());
+        Order order = orderMapper.toEntity(request);
+        order.setStatus(OrderStatus.PENDING);
+        Order savedOrder = orderRepository.save(order);
 
-        Order savedOrder = repository.save(order);
+        OrderCreatedEvent event = orderMapper.toEvent(savedOrder);
 
-        OrderCreatedEvent event = new OrderCreatedEvent();
-        event.setOrderId(savedOrder.getId().toString());
-        event.setUserId(savedOrder.getUserId());
-        event.setSymbol(savedOrder.getSymbol());
-        event.setType(savedOrder.getType());
-        event.setSide(savedOrder.getSide());
-        event.setPrice(savedOrder.getPrice());
-        event.setQuantity(savedOrder.getQuantity());
+        // Phase 5: Partitioned Scaling - Symbol as the Kafka Key
+        // This ensures orders for the same symbol are always processed in sequence by
+        // the same engine instance
+        eventPublisher.publish("order.created", event.getSymbol(), event);
 
-        publisher.publish("order.created", event.getSymbol(), event);
-
-        return mapper.toResponse(savedOrder);
+        return orderMapper.toResponse(savedOrder);
     }
 
     @Override
     @Transactional
     public void updateOrderStatus(UUID orderId, OrderStatus status) {
-        repository.findById(orderId).ifPresent(order -> {
+        orderRepository.findById(orderId).ifPresent(order -> {
             order.setStatus(status);
-            repository.save(order);
+            orderRepository.save(order);
         });
     }
 }
