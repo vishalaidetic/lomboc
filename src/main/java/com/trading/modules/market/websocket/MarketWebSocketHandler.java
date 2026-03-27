@@ -50,6 +50,9 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
         } else if ("UNSUBSCRIBE".equalsIgnoreCase(type)) {
             sessionSubscriptions.getOrDefault(session, Collections.emptySet()).remove(symbol);
             log.info("Session {} unsubscribed from {}", session.getId(), symbol);
+        } else if ("PING".equalsIgnoreCase(type)) {
+            // Echo back PONG for latency measurement
+            session.sendMessage(new TextMessage("{\"type\":\"PONG\"}"));
         }
     }
 
@@ -68,10 +71,12 @@ public class MarketWebSocketHandler extends TextWebSocketHandler {
 
             sessionSubscriptions.forEach((session, subscribedSymbols) -> {
                 if (session.isOpen() && (symbol.isEmpty() || subscribedSymbols.contains(symbol))) {
-                    try {
-                        session.sendMessage(textMessage);
-                    } catch (IOException e) {
-                        log.warn("Failed to send message to session {}: {}", session.getId(), e.getMessage());
+                    synchronized (session) {
+                        try {
+                            session.sendMessage(textMessage);
+                        } catch (IOException e) {
+                            log.warn("Failed to send message to session {}: {}", session.getId(), e.getMessage());
+                        }
                     }
                 }
             });

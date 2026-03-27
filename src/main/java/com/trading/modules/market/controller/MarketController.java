@@ -27,10 +27,16 @@ public class MarketController {
 
     @GetMapping("/price/{symbol}")
     public ResponseEntity<PriceTickEvent> getPrice(@PathVariable String symbol) {
+        // 1. Check Redis for sub-millisecond price retrieval (Hot Data)
         BigDecimal price = cacheService.getPrice(symbol);
+
+        // 2. Fallback to Database Persistence if Redis is cold (After Refresh/Restart)
         if (price == null) {
-            price = BigDecimal.valueOf(50000.00); // Default placeholder
+            price = marketRepository.findById(symbol)
+                    .map(Market::getLastPrice)
+                    .orElse(BigDecimal.ZERO); // Use actual 0 or last known DB price
         }
+
         return ResponseEntity.ok(new PriceTickEvent(symbol, price));
     }
 
@@ -41,7 +47,6 @@ public class MarketController {
 
     @GetMapping("/exchange-rate")
     public ResponseEntity<Map<String, BigDecimal>> getExchangeRate() {
-        // Mock current exchange rate for USD/EUR
         return ResponseEntity.ok(Map.of("EUR", BigDecimal.valueOf(0.925)));
     }
 }

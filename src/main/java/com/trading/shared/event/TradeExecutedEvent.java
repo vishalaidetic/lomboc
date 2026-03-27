@@ -24,6 +24,9 @@ public class TradeExecutedEvent extends BaseEvent {
     private String symbol;
     private BigDecimal price;
     private int quantity;
+
+    private String sessionId; // Tag for isolation
+
     @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
     private java.time.LocalDateTime executedAt;
 

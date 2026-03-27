@@ -30,27 +30,16 @@ public class MatchingEngineImpl implements MatchingEngine {
     private final EventPublisher publisher;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    // Idempotency: Keep track of processed order IDs per instance
-    // Note: In a production system, this could be a distributed bloom filter or
-    // Redis set
-    // But for a partitioned engine, a local set is fine as each symbol is pinned to
-    // one instance.
     private final Set<String> processedOrders = ConcurrentHashMap.newKeySet();
-
     private static final String REDIS_TRADE_TOPIC = "trading:trades:broadcast";
 
     @Override
     public void process(OrderCreatedEvent event) {
-        // 1. Idempotency Check
         if (processedOrders.contains(event.getOrderId())) {
-            log.info("Order {} already processed or resting, skipping duplicate event.", event.getOrderId());
             return;
         }
 
         synchronized (manager.getLock(event.getSymbol())) {
-            log.info("Phase 5 Partitioned Matching: Processing order {} | Symbol: {}",
-                    event.getOrderId(), event.getSymbol());
-
             OrderBook book = manager.getBook(event.getSymbol());
 
             OrderNode order = new OrderNode(
@@ -58,7 +47,8 @@ public class MatchingEngineImpl implements MatchingEngine {
                     event.getUserId(),
                     event.getPrice(),
                     event.getQuantity(),
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    event.getSessionId());
 
             if (OrderSide.BUY.equals(event.getSide())) {
                 matchBuy(order, book, event.getSymbol());
@@ -66,10 +56,7 @@ public class MatchingEngineImpl implements MatchingEngine {
                 matchSell(order, book, event.getSymbol());
             }
 
-            // 2. Mark as processed ONLY after success
             processedOrders.add(event.getOrderId());
-
-            // Optional: Limit size of processedOrders to prevent memory leak
             if (processedOrders.size() > 100000) {
                 processedOrders.clear();
             }
@@ -94,20 +81,14 @@ public class MatchingEngineImpl implements MatchingEngine {
 
                 emitTrade(buy, sell, tradedQty, sellPrice, symbol);
 
-                if (sell.getQuantity() == 0) {
+                if (sell.getQuantity() == 0)
                     level.poll();
-                }
             }
-
-            if (level.isEmpty()) {
+            if (level.isEmpty())
                 book.getSellBook().remove(sellPrice);
-            }
         }
-
-        if (buy.getQuantity() > 0) {
+        if (buy.getQuantity() > 0)
             book.addBuy(buy);
-            log.info("Order added to Buy Book: {}", buy.getOrderId());
-        }
     }
 
     private void matchSell(OrderNode sell, OrderBook book, String symbol) {
@@ -128,38 +109,35 @@ public class MatchingEngineImpl implements MatchingEngine {
 
                 emitTrade(buy, sell, tradedQty, buyPrice, symbol);
 
-                if (buy.getQuantity() == 0) {
+                if (buy.getQuantity() == 0)
                     level.poll();
-                }
             }
-
-            if (level.isEmpty()) {
+            if (level.isEmpty())
                 book.getBuyBook().remove(buyPrice);
-            }
         }
-
-        if (sell.getQuantity() > 0) {
+        if (sell.getQuantity() > 0)
             book.addSell(sell);
-            log.info("Order added to Sell Book: {}", sell.getOrderId());
-        }
     }
 
     private void emitTrade(OrderNode buy, OrderNode sell, int qty, BigDecimal price, String symbol) {
+        // Use sessionId from the participants (prefer buy side if different, though
+        // they should match)
+        String sid = buy.getSessionId() != null ? buy.getSessionId() : sell.getSessionId();
+
         TradeExecutedEvent event = new TradeExecutedEvent(
+                java.util.UUID.randomUUID(),
                 buy.getOrderId(),
                 buy.getUserId(),
                 sell.getOrderId(),
                 sell.getUserId(),
                 symbol,
                 price,
-                qty);
+                qty,
+                sid,
+                java.time.LocalDateTime.now());
 
-        // Publish to Kafka (Source of truth for Backend)
         publisher.publish("trade.executed", symbol, event);
-
-        // Publish to Redis (Fast UI broadcast)
         redisTemplate.convertAndSend(REDIS_TRADE_TOPIC, event);
-
-        log.info("Trade Emitted & Broadcasted: {} units for {} @ {}", qty, symbol, price);
+        log.info("Sim-Isolated Trade: {} units of {} @ {} (Session: {})", qty, symbol, price, sid);
     }
 }

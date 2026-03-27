@@ -32,8 +32,6 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    // ─── Topics ───────────────────────────────────────────────────────────────
-
     @Bean
     public NewTopic orderTopic() {
         return TopicBuilder.name("order.created").partitions(10).replicas(1).build();
@@ -44,27 +42,24 @@ public class KafkaConfig {
         return TopicBuilder.name("trade.executed").partitions(10).replicas(1).build();
     }
 
-    /**
-     * Creates a Kafka-specific ObjectMapper copy with JavaTimeModule explicitly
-     * registered.
-     * This is separate from the Spring MVC ObjectMapper to avoid side effects.
-     */
+    @Bean
+    public NewTopic settlementTopic() {
+        return TopicBuilder.name("order.settled").partitions(10).replicas(1).build();
+    }
+
     private ObjectMapper kafkaObjectMapper(ObjectMapper base) {
         return base.copy()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
-    // ─── Producer ─────────────────────────────────────────────────────────────
-
     @Bean
     public ProducerFactory<String, Object> producerFactory(ObjectMapper objectMapper) {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 
-        // Use a copy of Spring's ObjectMapper with JavaTimeModule — fixes LocalDateTime
         JsonSerializer<Object> serializer = new JsonSerializer<>(kafkaObjectMapper(objectMapper));
-        serializer.setAddTypeInfo(true); // Keep type headers so consumers know the exact type
+        serializer.setAddTypeInfo(true);
 
         return new DefaultKafkaProducerFactory<>(config, new StringSerializer(), serializer);
     }
@@ -74,20 +69,18 @@ public class KafkaConfig {
         return new KafkaTemplate<>(producerFactory);
     }
 
-    // ─── Consumer ─────────────────────────────────────────────────────────────
-
     @Bean
     public ConsumerFactory<String, Object> consumerFactory(ObjectMapper objectMapper) {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        // JsonDeserializer uses same ObjectMapper so LocalDateTime is handled correctly
-        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>(kafkaObjectMapper(objectMapper));
+        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>(Object.class,
+                kafkaObjectMapper(objectMapper));
         jsonDeserializer.addTrustedPackages("com.trading.*");
-        jsonDeserializer.setUseTypeHeaders(true); // Use type headers set by producer
+        jsonDeserializer.setUseTypeHeaders(true);
 
-        // Wrap with ErrorHandlingDeserializer to gracefully skip unreadable messages
+        // ErrorHandlingDeserializer needs explicit types to avoid warnings
         ErrorHandlingDeserializer<Object> safeDeserializer = new ErrorHandlingDeserializer<>(jsonDeserializer);
 
         return new DefaultKafkaConsumerFactory<>(config, new StringDeserializer(), safeDeserializer);

@@ -45,6 +45,6 @@ public class Order extends BaseEntity {
     private int quantity;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
 }

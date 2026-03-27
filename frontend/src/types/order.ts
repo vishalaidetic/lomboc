@@ -26,6 +26,7 @@ export interface CreateOrderRequest {
     side: OrderSide;
     price: number;
     quantity: number;
+    sessionId?: string | null;
 }
 
 export interface OrderResponse {

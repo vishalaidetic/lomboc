@@ -10,6 +10,8 @@ const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8081/ws/market";
 export function useMarketWebSocket() {
     const socketRef = useRef<WebSocket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [latency, setLatency] = useState<number>(0);
+    const pingSentTimeRef = useRef<number>(0);
 
     // Selectors
     const { currentSymbol, updatePrice } = useMarketStore();
@@ -20,39 +22,55 @@ export function useMarketWebSocket() {
 
     useEffect(() => {
         let reconnectTimeout: ReturnType<typeof setTimeout>;
+        let heartbeatInterval: ReturnType<typeof setInterval>;
 
         const connect = () => {
             const socket = new WebSocket(WS_URL);
 
             socket.onopen = () => {
                 setIsConnected(true);
-                // Dynamic Subscription on login/connect
                 if (currentSymbol) {
                     socket.send(JSON.stringify({ type: "SUBSCRIBE", symbol: currentSymbol }));
                 }
+
+                // Start Latency Heartbeat
+                heartbeatInterval = setInterval(() => {
+                    if (socket.readyState === WebSocket.OPEN) {
+                        pingSentTimeRef.current = Date.now();
+                        socket.send(JSON.stringify({ type: "PING" }));
+                    }
+                }, 5000);
             };
 
             socket.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
 
-                    // Routing Logic based on Event Type
-                    if (data.symbol && data.price) {
-                        updatePrice(data.symbol, data.price);
+                    if (data.type === "PONG") {
+                        const rtt = Date.now() - pingSentTimeRef.current;
+                        setLatency(rtt);
+                        return;
                     }
 
-                    // Trade Execution Flow
+                    const isSimulationMode = useMarketStore.getState().isSimulationMode;
+                    const simulationSessionId = useMarketStore.getState().simulationSessionId;
+
+                    if (data.symbol && data.price) {
+                        const tickSessionId = data.sessionId || null;
+                        const isMatch = isSimulationMode
+                            ? (tickSessionId === simulationSessionId)
+                            : (tickSessionId === null);
+
+                        if (isMatch) {
+                            updatePrice(data.symbol, data.price);
+                        }
+                    }
+
                     if (data.tradeId || (data.buyUserId && data.sellUserId)) {
                         const isRelevant = data.buyUserId === userId || data.sellUserId === userId;
-
                         if (isRelevant) {
-                            // Update matching order statuses
                             handleOrderTrade(data, userId);
-
-                            // Sync portfolio data
                             queryClient.invalidateQueries({ queryKey: ["portfolio", userId] });
-
-                            // Record trade in local history
                             addTrade({
                                 id: data.tradeId || Math.random().toString(),
                                 buyOrderId: data.buyOrderId,
@@ -72,13 +90,12 @@ export function useMarketWebSocket() {
             };
 
             socket.onclose = () => {
-                console.log("Market WebSocket disconnected, retrying...");
                 setIsConnected(false);
+                clearInterval(heartbeatInterval);
                 reconnectTimeout = setTimeout(connect, 3000);
             };
 
             socket.onerror = (error) => {
-                console.error("Market WebSocket error:", error);
                 socket.close();
             };
 
@@ -88,12 +105,11 @@ export function useMarketWebSocket() {
         connect();
 
         return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-            }
+            if (socketRef.current) socketRef.current.close();
             clearTimeout(reconnectTimeout);
+            clearInterval(heartbeatInterval);
         };
-    }, [updatePrice, currentSymbol, userId]); // Re-connect or send sub on symbol change
+    }, [updatePrice, currentSymbol, userId]);
 
-    return { isConnected };
+    return { isConnected, latency };
 }

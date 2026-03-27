@@ -20,6 +20,9 @@ interface MarketState {
     currency: "USD" | "EUR";
     exchangeRate: number;
     orderBooks: Record<string, OrderBookData>;
+    isSimulationMode: boolean;
+    simulationTime: number | null;
+    simulationSessionId: string | null;
 
     setCurrentSymbol: (symbol: string) => void;
     setSymbols: (symbols: Market[]) => void;
@@ -27,6 +30,8 @@ interface MarketState {
     setExchangeRate: (rate: number) => void;
     updatePrice: (symbol: string, price: number) => void;
     setOrderBook: (symbol: string, bids: any[], asks: any[]) => void;
+    setSimulationMode: (active: boolean, sessionId?: string | null) => void;
+    setSimulationTime: (time: number | null) => void;
 }
 
 export const useMarketStore = create<MarketState>((set) => ({
@@ -36,6 +41,9 @@ export const useMarketStore = create<MarketState>((set) => ({
     currency: "USD",
     exchangeRate: 0.925,
     orderBooks: {},
+    isSimulationMode: false,
+    simulationTime: null,
+    simulationSessionId: null,
 
     setCurrentSymbol: (symbol) => set({ currentSymbol: symbol }),
     setSymbols: (symbols) => set({ symbols }),
@@ -52,4 +60,7 @@ export const useMarketStore = create<MarketState>((set) => ({
                 [symbol]: { bids, asks }
             },
         })),
+    setSimulationMode: (active, sessionId = null) =>
+        set({ isSimulationMode: active, simulationSessionId: sessionId }),
+    setSimulationTime: (time) => set({ simulationTime: time }),
 }));

@@ -17,6 +17,8 @@ export default function PortfolioPage() {
     const setPortfolio = usePortfolioStore((state) => state.setPortfolio);
     const setTrades = usePortfolioStore((state) => state.setTrades);
     const prices = useMarketStore((state) => state.prices);
+    const currency = useMarketStore((state) => state.currency);
+    const exchangeRate = useMarketStore((state) => state.exchangeRate);
 
     // Initial Sync
     useEffect(() => {
@@ -28,8 +30,9 @@ export default function PortfolioPage() {
     }, [initialTrades, setTrades]);
 
     const totalBalance = holdings.reduce((acc, h) => {
-        const price = prices[h.symbol] || h.avgPrice;
-        return acc + h.quantity * price;
+        const livePrice = prices[h.symbol] || h.avgPrice;
+        const valueInUSD = h.quantity * livePrice;
+        return acc + (currency === "EUR" ? valueInUSD * exchangeRate : valueInUSD);
     }, 0);
 
     return (
@@ -47,7 +50,8 @@ export default function PortfolioPage() {
                 <div className="flex flex-col items-end">
                     <span className="text-[10px] font-black tracking-widest text-zinc-500 uppercase mb-1">Total Value (Est)</span>
                     <div className="text-3xl font-black text-emerald-400">
-                        ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {currency === "EUR" ? "€" : "$"}
+                        {totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                 </div>
             </header>

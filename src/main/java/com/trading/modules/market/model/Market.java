@@ -1,5 +1,6 @@
 package com.trading.modules.market.model;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
 
 import jakarta.persistence.Entity;
@@ -39,4 +40,6 @@ public class Market {
 
     @Builder.Default
     private int quantityPrecision = 8;
+
+    private BigDecimal lastPrice; // Permanent price persistence
 }

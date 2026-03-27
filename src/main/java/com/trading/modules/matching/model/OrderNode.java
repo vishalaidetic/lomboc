@@ -14,4 +14,5 @@ public class OrderNode {
     private BigDecimal price;
     private int quantity;
     private long timestamp;
+    private String sessionId; // Tag for isolation
 }
