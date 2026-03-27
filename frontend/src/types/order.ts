@@ -15,6 +15,7 @@ export const OrderStatus = {
     FILLED: "FILLED",
     CANCELLED: "CANCELLED",
     PARTIALLY_FILLED: "PARTIALLY_FILLED",
+    SETTLED: "SETTLED",
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 

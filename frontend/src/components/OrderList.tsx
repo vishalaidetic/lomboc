@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { useOrderStore } from "@/store/useOrderStore";
 import { OrderSide, OrderStatus } from "@/types/order";
 import { useQuery } from "@tanstack/react-query";
-import { ListIcon } from "lucide-react";
+import { CheckCircle2, Clock, ListIcon } from "lucide-react";
 import { useEffect } from "react";
 
 export function OrderList() {
@@ -13,6 +13,7 @@ export function OrderList() {
     const { data: initialOrders } = useQuery({
         queryKey: ["orders", PLACEHOLDER_USER_ID],
         queryFn: () => orderService.getOrdersByUserId(PLACEHOLDER_USER_ID),
+        refetchInterval: 3000, // Poll for status updates
     });
 
     useEffect(() => {
@@ -28,7 +29,7 @@ export function OrderList() {
                 <h2 className="text-lg font-bold tracking-tight text-white">Recent Orders</h2>
             </div>
 
-            <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+            <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                 {orders.length === 0 ? (
                     <div className="py-20 text-center text-xs font-bold text-zinc-700 uppercase">
                         No active orders
@@ -37,7 +38,12 @@ export function OrderList() {
                     orders.map((order) => (
                         <div
                             key={order.id}
-                            className="group flex flex-col gap-3 rounded-xl border border-white/5 bg-zinc-950/50 p-4 transition-all hover:border-white/10"
+                            className={cn(
+                                "group flex flex-col gap-3 rounded-xl border p-4 transition-all duration-300",
+                                order.status === "SETTLED"
+                                    ? "bg-emerald-500/[0.03] border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)]"
+                                    : "bg-zinc-950/50 border-white/5 hover:border-white/10"
+                            )}
                         >
                             <div className="flex items-center justify-between">
                                 <span
@@ -62,22 +68,31 @@ export function OrderList() {
 
                             <div className="flex items-end justify-between">
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-xs font-bold text-zinc-500 uppercase">
-                                        {order.quantity} Units @ {order.price}
+                                    <span className="text-xs font-bold text-zinc-400 font-mono">
+                                        {order.quantity.toLocaleString()} UNITS @ {order.price.toLocaleString()}
                                     </span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-800" />
-                                        <span className="text-[10px] font-bold text-zinc-700">
-                                            PENDING SETTLEMENT
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {order.status === "SETTLED" ? (
+                                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                        ) : (
+                                            <Clock className="h-3 w-3 text-zinc-600 animate-pulse" />
+                                        )}
+                                        <span className={cn(
+                                            "text-[9px] font-black uppercase tracking-widest",
+                                            order.status === "SETTLED" ? "text-emerald-500" : "text-zinc-600"
+                                        )}>
+                                            {order.status === "SETTLED" ? "FUNDS SETTLED" : "PHASE 1: MATCHED"}
                                         </span>
                                     </div>
                                 </div>
 
                                 <div className={cn(
-                                    "flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest",
+                                    "flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-all duration-500",
                                     order.status === OrderStatus.PENDING
                                         ? "bg-zinc-800 text-zinc-400"
-                                        : "bg-emerald-500/20 text-emerald-500"
+                                        : order.status === "SETTLED"
+                                            ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                            : "bg-emerald-500/20 text-emerald-500"
                                 )}>
                                     {order.status}
                                 </div>

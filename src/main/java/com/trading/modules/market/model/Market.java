@@ -1,5 +1,7 @@
 package com.trading.modules.market.model;
 
+import java.time.LocalTime;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -28,6 +30,9 @@ public class Market {
 
     private String baseCurrency;
     private String quoteCurrency;
+
+    private LocalTime openTime;
+    private LocalTime closeTime;
 
     @Builder.Default
     private int pricePrecision = 2;

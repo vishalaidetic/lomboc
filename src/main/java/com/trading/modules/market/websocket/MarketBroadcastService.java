@@ -1,10 +1,9 @@
 package com.trading.modules.market.websocket;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.data.redis.connection.Message;
+import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,31 +11,25 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MarketBroadcastService {
+public class MarketBroadcastService implements MessageListener {
 
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final MarketWebSocketHandler webSocketHandler;
 
-    private static final String MARKET_DATA_TOPIC = "trading:market:data";
-
-    /**
-     * Listen to trade executions from any matching engine instance
-     * and broadcast to Redis for cross-node UI synchronization.
-     */
-    @KafkaListener(topics = "trade.executed", groupId = "market-broadcast-group")
-    public void handleTradeExecuted(Object event) {
+    @Override
+    public void onMessage(Message message, byte[] pattern) {
         try {
-            String payload = objectMapper.writeValueAsString(event);
+            // Redis Template deserializes based on its config.
+            // If using GenericJackson2JsonRedisSerializer, we can get the object directly.
+            Object event = redisTemplate.getValueSerializer().deserialize(message.getBody());
 
-            // 1. Broadcast to local WebSocket sessions on this instance
+            log.debug("Received trade from Redis: {}", event);
+
+            // Broadcast to local subscribers of the symbol
             webSocketHandler.broadcast(event);
 
-            // 2. Publish to Redis for other WebSocket node instances to hear
-            redisTemplate.convertAndSend(MARKET_DATA_TOPIC, payload);
-
         } catch (Exception e) {
-            log.error("Failed to broadcast market event: {}", e.getMessage());
+            log.error("Failed to process Redis broadcast message: {}", e.getMessage());
         }
     }
 }

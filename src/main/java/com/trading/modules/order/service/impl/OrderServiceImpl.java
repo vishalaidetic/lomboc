@@ -15,6 +15,7 @@ import com.trading.modules.order.dto.OrderResponse;
 import com.trading.modules.order.mapper.OrderMapper;
 import com.trading.modules.order.model.Order;
 import com.trading.modules.order.model.OrderStatus;
+import com.trading.modules.order.service.OrderRoutingService;
 import com.trading.modules.order.service.OrderService;
 import com.trading.shared.event.OrderCreatedEvent;
 
@@ -28,6 +29,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final EventPublisher eventPublisher;
     private final MarketConfigService marketConfigService;
+    private final OrderRoutingService routingService;
 
     @Override
     public List<OrderResponse> getOrdersByUserId(UUID userId) {
@@ -46,7 +48,10 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
 
         OrderCreatedEvent event = orderMapper.toEvent(savedOrder);
-        eventPublisher.publish("order.created", event.getSymbol(), event);
+
+        // Resolve Partition Key (Symbol-based partitioning)
+        String partitionKey = routingService.resolvePartitionKey(event);
+        eventPublisher.publish("order.created", partitionKey, event);
 
         return orderMapper.toResponse(savedOrder);
     }

@@ -23,27 +23,22 @@ public class TradeConsumer {
 
     @KafkaListener(topics = "trade.executed", groupId = "portfolio-group")
     public void consume(TradeExecutedEvent event) {
-        // Phase 5: Distributed Deduplication (Exactly-once semantics)
         Boolean alreadyProcessed = redisTemplate.opsForSet().isMember(PROCESSED_TRADES_KEY,
                 event.getTradeId().toString());
         if (Boolean.TRUE.equals(alreadyProcessed)) {
-            log.warn("Trade {} already settled, skipping duplicate event.", event.getTradeId());
+            log.warn("Trade {} already settled, skipping duplicate.", event.getTradeId());
             return;
         }
 
-        log.info("Trade Consumer received event for trade: {} | Symbol: {}",
-                event.getTradeId(), event.getSymbol());
+        log.info("TradeConsumer: processing trade {} | symbol: {}", event.getTradeId(), event.getSymbol());
 
         try {
             tradeService.saveTrade(event);
             settlementService.process(event);
-
-            // Mark as processed in Redis (idempotency)
             redisTemplate.opsForSet().add(PROCESSED_TRADES_KEY, event.getTradeId().toString());
-
-            log.info("Trade and Settlement settled permanently for trade: {}", event.getTradeId());
+            log.info("Settlement complete for trade: {}", event.getTradeId());
         } catch (Exception e) {
-            log.error("Critical Settlement Error for trade {}: {}", event.getTradeId(), e.getMessage());
+            log.error("Settlement failed for trade {}: {}", event.getTradeId(), e.getMessage(), e);
         }
     }
 }

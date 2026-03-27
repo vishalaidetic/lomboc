@@ -1,6 +1,14 @@
 import { type PriceTickEvent } from "@/types/market";
 import { api } from "./client";
 
+export interface Market {
+    symbol: string;
+    type: string;
+    active: boolean;
+    openTime?: string;
+    closeTime?: string;
+}
+
 export const marketService = {
     getLatestPrice: async (symbol: string): Promise<PriceTickEvent> => {
         const { data } = await api.get<PriceTickEvent>(`/market/price/${symbol}`);
@@ -10,8 +18,12 @@ export const marketService = {
         const { data } = await api.get(`/matching/orderbook/${symbol}`);
         return data;
     },
-    getSymbols: async (): Promise<string[]> => {
-        const { data } = await api.get<string[]>("/market/symbols");
+    getSymbols: async (): Promise<Market[]> => {
+        const { data } = await api.get<Market[]>("/market/symbols");
+        return data;
+    },
+    getExchangeRate: async (): Promise<{ EUR: number }> => {
+        const { data } = await api.get<{ EUR: number }>("/market/exchange-rate");
         return data;
     },
 };

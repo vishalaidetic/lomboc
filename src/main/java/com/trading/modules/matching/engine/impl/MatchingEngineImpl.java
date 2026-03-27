@@ -2,7 +2,10 @@ package com.trading.modules.matching.engine.impl;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.trading.infrastructure.kafka.producer.EventPublisher;
@@ -25,12 +28,28 @@ public class MatchingEngineImpl implements MatchingEngine {
 
     private final OrderBookManager manager;
     private final EventPublisher publisher;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    // Idempotency: Keep track of processed order IDs per instance
+    // Note: In a production system, this could be a distributed bloom filter or
+    // Redis set
+    // But for a partitioned engine, a local set is fine as each symbol is pinned to
+    // one instance.
+    private final Set<String> processedOrders = ConcurrentHashMap.newKeySet();
+
+    private static final String REDIS_TRADE_TOPIC = "trading:trades:broadcast";
 
     @Override
     public void process(OrderCreatedEvent event) {
+        // 1. Idempotency Check
+        if (processedOrders.contains(event.getOrderId())) {
+            log.info("Order {} already processed or resting, skipping duplicate event.", event.getOrderId());
+            return;
+        }
+
         synchronized (manager.getLock(event.getSymbol())) {
-            log.info("Phase 4 Matching: Processing order {} | Side: {} | Symbol: {}",
-                    event.getOrderId(), event.getSide(), event.getSymbol());
+            log.info("Phase 5 Partitioned Matching: Processing order {} | Symbol: {}",
+                    event.getOrderId(), event.getSymbol());
 
             OrderBook book = manager.getBook(event.getSymbol());
 
@@ -45,6 +64,14 @@ public class MatchingEngineImpl implements MatchingEngine {
                 matchBuy(order, book, event.getSymbol());
             } else {
                 matchSell(order, book, event.getSymbol());
+            }
+
+            // 2. Mark as processed ONLY after success
+            processedOrders.add(event.getOrderId());
+
+            // Optional: Limit size of processedOrders to prevent memory leak
+            if (processedOrders.size() > 100000) {
+                processedOrders.clear();
             }
         }
     }
@@ -126,7 +153,13 @@ public class MatchingEngineImpl implements MatchingEngine {
                 symbol,
                 price,
                 qty);
+
+        // Publish to Kafka (Source of truth for Backend)
         publisher.publish("trade.executed", symbol, event);
-        log.info("Trade Emitted: {} units for {} @ {}", qty, symbol, price);
+
+        // Publish to Redis (Fast UI broadcast)
+        redisTemplate.convertAndSend(REDIS_TRADE_TOPIC, event);
+
+        log.info("Trade Emitted & Broadcasted: {} units for {} @ {}", qty, symbol, price);
     }
 }

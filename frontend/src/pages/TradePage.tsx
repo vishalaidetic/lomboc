@@ -9,12 +9,33 @@ import { cn } from "@/lib/utils";
 import { useMarketStore } from "@/store/useMarketStore";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router";
 
 export default function TradePage() {
-    const { symbol = "BTCUSD" } = useParams();
+    const { currentSymbol: symbol, setCurrentSymbol, currency, setCurrency, setSymbols, exchangeRate, setExchangeRate } = useMarketStore();
     const { isConnected } = useMarketWebSocket();
     const updatePrice = useMarketStore((state) => state.updatePrice);
+
+    // Fetch Full Market Metadata
+    const { data: marketData } = useQuery({
+        queryKey: ["symbols"],
+        queryFn: async () => {
+            const data = await marketService.getSymbols();
+            setSymbols(data);
+            return data;
+        },
+    });
+
+    // Fetch EUR Exchange Rate
+    const { data: rateData } = useQuery({
+        queryKey: ["rate"],
+        queryFn: async () => {
+            const data = await marketService.getExchangeRate();
+            if (data?.EUR) setExchangeRate(data.EUR);
+            return data;
+        },
+    });
+
+    const currentRate = currency === "EUR" ? exchangeRate : 1;
 
     // Performance State: Batching updates
     const [uiPriceData, setUiPriceData] = useState<{ time: number; value: number }[]>([]);
@@ -25,11 +46,6 @@ export default function TradePage() {
     const lastBookRef = useRef<{ bids: any[]; asks: any[] } | null>(null);
     const frameRef = useRef<number | null>(null);
 
-    // Latest price polling (simulated high frequency)
-    const { data: symbols } = useQuery({
-        queryKey: ["symbols"],
-        queryFn: () => marketService.getSymbols(),
-    });
 
     const { data: latestPrice } = useQuery({
         queryKey: ["price", symbol],
@@ -46,22 +62,30 @@ export default function TradePage() {
     });
 
     // BATCHER: Uses requestAnimationFrame to sync UI once per frame (~60-120Hz)
-    // This prevents React from re-rendering for every single Kafka event if they come at 1k/sec
     useEffect(() => {
         const updateUIFrame = () => {
             if (lastPriceRef.current) {
                 const price = lastPriceRef.current;
+                const displayPrice = currency === "EUR" ? price.value * exchangeRate : price.value;
+
                 setUiPriceData(prev => {
-                    // Check if already has this timestamp to avoid duplicates if polling is faster than re-render
                     if (prev.length > 0 && prev[prev.length - 1].time === price.time) return prev;
-                    return [...prev, price].slice(-200);
+                    return [...prev, { ...price, value: displayPrice }].slice(-200);
                 });
-                updatePrice(symbol, price.value);
+                updatePrice(symbol, price.value); // Keep internally in USD
                 lastPriceRef.current = null;
             }
 
             if (lastBookRef.current) {
-                setUiOrderBook(lastBookRef.current);
+                const book = lastBookRef.current;
+                const convertLevel = (level: any) => ({
+                    ...level,
+                    price: currency === "EUR" ? level.price * exchangeRate : level.price
+                });
+                setUiOrderBook({
+                    bids: (book.bids || []).map(convertLevel),
+                    asks: (book.asks || []).map(convertLevel)
+                });
                 lastBookRef.current = null;
             }
 
@@ -72,11 +96,10 @@ export default function TradePage() {
         return () => {
             if (frameRef.current) cancelAnimationFrame(frameRef.current);
         };
-    }, [symbol, updatePrice]);
+    }, [symbol, updatePrice, currency, exchangeRate]);
 
     // Buffer incoming data
     useEffect(() => {
-        // Clear UI state when symbol changes to ensure zero market data leakage
         setUiPriceData([]);
         setUiOrderBook({ bids: [], asks: [] });
         lastPriceRef.current = null;
@@ -85,7 +108,6 @@ export default function TradePage() {
 
     useEffect(() => {
         if (latestPrice && latestPrice.price) {
-            // Synchronize with exact UNIX timestamp for consistent chart rendering
             const now = Math.floor(Date.now() / 1000);
             lastPriceRef.current = { time: now, value: latestPrice.price };
         }
@@ -99,33 +121,53 @@ export default function TradePage() {
 
     return (
         <div className="flex min-h-screen flex-col bg-zinc-950 text-white overflow-hidden p-6 sm:p-10 relative">
-            {/* Background Effects */}
             <div className="absolute top-0 -left-40 w-80 h-80 bg-emerald-500/10 blur-[120px] rounded-full" />
             <div className="absolute bottom-0 -right-40 w-80 h-80 bg-rose-500/10 blur-[120px] rounded-full" />
 
             <main className="z-10 grid flex-1 grid-cols-1 gap-10 lg:grid-cols-12 h-full">
-                {/* Left Panel: Charts and Analytics */}
                 <div className="lg:col-span-8 flex flex-col gap-10 overflow-hidden">
                     <header className="flex flex-col gap-8 border-b border-white/5 pb-10">
                         <div className="flex items-center justify-between">
                             <PriceTicker symbol={symbol} />
 
-                            {/* DYNAMIC SYMBOL SWITCHER */}
-                            <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
-                                {(symbols || ["BTCUSD", "ETHUSD", "SOLUSD"]).map((s) => (
-                                    <button
-                                        key={s}
-                                        onClick={() => window.location.href = `/trade/${s}`}
-                                        className={cn(
-                                            "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
-                                            symbol === s
-                                                ? "bg-white text-black shadow-xl"
-                                                : "text-zinc-500 hover:text-white"
-                                        )}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
+                            <div className="flex items-center gap-6">
+                                {/* Currency Switcher */}
+                                <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
+                                    {["USD", "EUR"].map((c) => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setCurrency(c as any)}
+                                            className={cn(
+                                                "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                                                currency === c
+                                                    ? "bg-zinc-800 text-white shadow-xl border border-white/10"
+                                                    : "text-zinc-600 hover:text-white"
+                                            )}
+                                        >
+                                            {c}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Symbol Switcher */}
+                                <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
+                                    {(useMarketStore.getState().symbols.length > 0
+                                        ? useMarketStore.getState().symbols.map(s => s.symbol)
+                                        : ["BTCUSD", "AAPL", "XAUUSD"]).map((s) => (
+                                            <button
+                                                key={s}
+                                                onClick={() => setCurrentSymbol(s)}
+                                                className={cn(
+                                                    "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                                                    symbol === s
+                                                        ? "bg-white text-black shadow-xl"
+                                                        : "text-zinc-500 hover:text-white"
+                                                )}
+                                            >
+                                                {s}
+                                            </button>
+                                        ))}
+                                </div>
                             </div>
                         </div>
 

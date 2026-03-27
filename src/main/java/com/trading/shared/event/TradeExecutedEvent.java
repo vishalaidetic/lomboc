@@ -1,12 +1,12 @@
 package com.trading.shared.event;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -24,11 +24,13 @@ public class TradeExecutedEvent extends BaseEvent {
     private String symbol;
     private BigDecimal price;
     private int quantity;
-    private LocalDateTime executedAt;
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS")
+    private java.time.LocalDateTime executedAt;
 
-    public TradeExecutedEvent(String buyOrderId, UUID buyUserId, String sellOrderId, UUID sellUserId, String symbol,
-            BigDecimal price, int quantity) {
-        this.tradeId = UUID.randomUUID();
+    public TradeExecutedEvent(String buyOrderId, java.util.UUID buyUserId, String sellOrderId,
+            java.util.UUID sellUserId, String symbol,
+            java.math.BigDecimal price, int quantity) {
+        this.tradeId = java.util.UUID.randomUUID();
         this.buyOrderId = buyOrderId;
         this.buyUserId = buyUserId;
         this.sellOrderId = sellOrderId;
@@ -36,6 +38,6 @@ public class TradeExecutedEvent extends BaseEvent {
         this.symbol = symbol;
         this.price = price;
         this.quantity = quantity;
-        this.executedAt = LocalDateTime.now();
+        this.executedAt = java.time.LocalDateTime.now();
     }
 }

@@ -12,7 +12,7 @@ export function useMarketWebSocket() {
     const [isConnected, setIsConnected] = useState(false);
 
     // Selectors
-    const updatePrice = useMarketStore((state) => state.updatePrice);
+    const { currentSymbol, updatePrice } = useMarketStore();
     const addTrade = usePortfolioStore((state) => state.addTrade);
     const handleOrderTrade = useOrderStore((state) => state.handleTradeEvent);
     const { userId } = useAuthStore();
@@ -26,6 +26,10 @@ export function useMarketWebSocket() {
 
             socket.onopen = () => {
                 setIsConnected(true);
+                // Dynamic Subscription on login/connect
+                if (currentSymbol) {
+                    socket.send(JSON.stringify({ type: "SUBSCRIBE", symbol: currentSymbol }));
+                }
             };
 
             socket.onmessage = (event) => {
@@ -89,7 +93,7 @@ export function useMarketWebSocket() {
             }
             clearTimeout(reconnectTimeout);
         };
-    }, [updatePrice]);
+    }, [updatePrice, currentSymbol, userId]); // Re-connect or send sub on symbol change
 
     return { isConnected };
 }

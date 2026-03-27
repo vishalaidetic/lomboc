@@ -24,12 +24,15 @@ public class MatchingEngineTest {
     private MatchingEngine engine;
     private OrderBookManager manager;
     private EventPublisher publisher;
+    private org.springframework.data.redis.core.RedisTemplate<String, Object> redisTemplate;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         manager = new OrderBookManager();
         publisher = mock(EventPublisher.class);
-        engine = new MatchingEngineImpl(manager, publisher);
+        redisTemplate = mock(org.springframework.data.redis.core.RedisTemplate.class);
+        engine = new MatchingEngineImpl(manager, publisher, redisTemplate);
     }
 
     @Test

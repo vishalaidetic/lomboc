@@ -1,7 +1,7 @@
 package com.trading.modules.market.service;
 
+import java.time.LocalTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,8 +29,12 @@ public class MarketConfigService {
             List<Market> defaults = List.of(
                     Market.builder().symbol("BTCUSD").type(MarketType.CRYPTO).active(true).build(),
                     Market.builder().symbol("ETHUSD").type(MarketType.CRYPTO).active(true).build(),
-                    Market.builder().symbol("SOLUSD").type(MarketType.CRYPTO).active(true).build(),
-                    Market.builder().symbol("AAPL").type(MarketType.STOCK).active(true).build());
+                    Market.builder().symbol("XAUUSD").type(MarketType.FOREX).active(true).build(),
+                    Market.builder().symbol("AAPL").type(MarketType.STOCK).active(true)
+                            .openTime(LocalTime.of(9, 30))
+                            .closeTime(LocalTime.of(16, 0))
+                            .build(),
+                    Market.builder().symbol("BTCUSD-REPLAY").type(MarketType.REPLAY).active(true).build());
             repository.saveAll(defaults);
         }
     }
@@ -40,9 +44,23 @@ public class MarketConfigService {
     }
 
     public void validateMarket(String symbol) {
-        Optional<Market> market = repository.findById(symbol);
-        if (market.isEmpty() || !market.get().isActive()) {
-            throw new RuntimeException("Market " + symbol + " is closed or does not exist");
+        Market market = repository.findById(symbol)
+                .orElseThrow(() -> new RuntimeException("Market " + symbol + " does not exist"));
+
+        if (!market.isActive()) {
+            throw new RuntimeException("Market " + symbol + " is closed");
+        }
+
+        // Check Timed Sessions (STOCK)
+        if (MarketType.STOCK.equals(market.getType())) {
+            LocalTime now = LocalTime.now();
+            if (market.getOpenTime() != null && now.isBefore(market.getOpenTime())) {
+                throw new RuntimeException("Market " + symbol + " not yet open. Opens at " + market.getOpenTime());
+            }
+            if (market.getCloseTime() != null && now.isAfter(market.getCloseTime())) {
+                throw new RuntimeException(
+                        "Market " + symbol + " is closed for the day. Closed at " + market.getCloseTime());
+            }
         }
     }
 }
