@@ -1,13 +1,16 @@
 import { Layout } from "@/components/Layout";
+import { PageLoader } from "@/components/PageLoader";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
-
 // Lazy routes
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
 const TradePage = lazy(() => import("@/pages/TradePage"));
 const PortfolioPage = lazy(() => import("@/pages/PortfolioPage"));
+const InvestPage = lazy(() => import("@/pages/InvestPage"));
+const StockDetailPage = lazy(() => import("@/pages/StockDetailPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 const router = createBrowserRouter([
@@ -37,6 +40,14 @@ const router = createBrowserRouter([
                         ),
                     },
                     {
+                        path: "/dashboard",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <DashboardPage />
+                            </Suspense>
+                        ),
+                    },
+                    {
                         path: "/trade/:symbol",
                         element: (
                             <Suspense fallback={<PageLoader />}>
@@ -49,6 +60,22 @@ const router = createBrowserRouter([
                         element: (
                             <Suspense fallback={<PageLoader />}>
                                 <PortfolioPage />
+                            </Suspense>
+                        ),
+                    },
+                    {
+                        path: "/invest",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <InvestPage />
+                            </Suspense>
+                        ),
+                    },
+                    {
+                        path: "/invest/:symbol",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <StockDetailPage />
                             </Suspense>
                         ),
                     },
@@ -68,29 +95,4 @@ const router = createBrowserRouter([
 
 export function AppRouter() {
     return <RouterProvider router={router} />;
-}
-
-function PageLoader() {
-    return (
-        <div
-            style={{
-                display: "flex",
-                minHeight: "100vh",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "#09090b",
-            }}
-        >
-            <div
-                style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.1)",
-                    borderTop: "2px solid #3b82f6",
-                    animation: "spin 0.8s linear infinite",
-                }}
-            />
-        </div>
-    );
 }

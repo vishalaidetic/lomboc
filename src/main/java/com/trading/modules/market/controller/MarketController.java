@@ -45,6 +45,31 @@ public class MarketController {
         return ResponseEntity.ok(marketRepository.findAll());
     }
 
+    @GetMapping("/fundamentals/{symbol}")
+    public ResponseEntity<com.trading.modules.market.dto.StockFundamentalResponse> getFundamentals(
+            @PathVariable String symbol) {
+        // Mocking professional fundamental data for simulation
+        java.math.BigDecimal marketCap = java.math.BigDecimal.valueOf(2.5)
+                .multiply(java.math.BigDecimal.valueOf(Math.pow(10, 12))); // $2.5T
+        if (symbol.equals("NVDA"))
+            marketCap = java.math.BigDecimal.valueOf(2.2).multiply(java.math.BigDecimal.valueOf(Math.pow(10, 12)));
+        if (symbol.equals("TSLA"))
+            marketCap = java.math.BigDecimal.valueOf(550).multiply(java.math.BigDecimal.valueOf(Math.pow(10, 9)));
+
+        return ResponseEntity.ok(com.trading.modules.market.dto.StockFundamentalResponse.builder()
+                .symbol(symbol)
+                .marketCap(marketCap)
+                .peRatio(java.math.BigDecimal.valueOf(28.4 + (Math.random() * 5)))
+                .dividendYield(java.math.BigDecimal.valueOf(0.65))
+                .volume24h(java.math.BigDecimal.valueOf(18500000))
+                .high52w(java.math.BigDecimal.valueOf(195.4))
+                .low52w(java.math.BigDecimal.valueOf(120.5))
+                .companyDescription(
+                        "Leading global technology company focused on innovation and sustainable growth in the "
+                                + symbol + " sector.")
+                .build());
+    }
+
     @GetMapping("/exchange-rate")
     public ResponseEntity<Map<String, BigDecimal>> getExchangeRate() {
         return ResponseEntity.ok(Map.of("EUR", BigDecimal.valueOf(0.925)));

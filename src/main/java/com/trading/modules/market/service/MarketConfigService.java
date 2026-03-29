@@ -24,28 +24,57 @@ public class MarketConfigService {
     @PostConstruct
     @Transactional
     public void initDefaultMarkets() {
-        if (repository.count() == 0) {
-            log.info("Initializing default markets...");
-            List<Market> defaults = List.of(
-                    Market.builder().symbol("BTCUSD").type(MarketType.CRYPTO).active(true).build(),
-                    Market.builder().symbol("ETHUSD").type(MarketType.CRYPTO).active(true).build(),
-                    Market.builder().symbol("XAUUSD").type(MarketType.FOREX).active(true).build(),
-                    Market.builder().symbol("AAPL").type(MarketType.STOCK).active(true)
-                            .openTime(LocalTime.of(9, 30))
-                            .closeTime(LocalTime.of(16, 0))
-                            .build(),
-                    Market.builder().symbol("BTCUSD-REPLAY").type(MarketType.REPLAY).active(true).build());
-            repository.saveAll(defaults);
-        }
+        log.info("Checking and initializing default markets...");
+        LocalTime open = LocalTime.of(9, 30);
+        LocalTime close = LocalTime.of(16, 0);
+
+        List<Market> defaults = List.of(
+                Market.builder().symbol("BTCUSD").type(MarketType.CRYPTO).active(true).build(),
+                Market.builder().symbol("ETHUSD").type(MarketType.CRYPTO).active(true).build(),
+                Market.builder().symbol("XAUUSD").type(MarketType.FOREX).active(true).build(),
+                Market.builder().symbol("AAPL").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("TSLA").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("NVDA").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("MSFT").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("GOOGL").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("AMZN").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("META").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("NFLX").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("AMD").type(MarketType.STOCK).active(true).openTime(open).closeTime(close)
+                        .build(),
+                Market.builder().symbol("BTCUSD-REPLAY").type(MarketType.REPLAY).active(true).build());
+
+        defaults.forEach(market -> {
+            String symbol = java.util.Objects.requireNonNull(market.getSymbol());
+            if (!repository.existsById(symbol)) {
+                log.info("Adding missing default market: {}", symbol);
+                repository.saveAndFlush(market);
+            }
+        });
     }
 
     public List<String> getActiveSymbols() {
         return repository.findByActiveTrue().stream().map(Market::getSymbol).toList();
     }
 
+    public List<Market> getMarketsByType(MarketType type) {
+        return repository.findByActiveTrue().stream()
+                .filter(m -> type.equals(m.getType()))
+                .toList();
+    }
+
     public void validateMarket(String symbol) {
-        Market market = repository.findById(symbol)
-                .orElseThrow(() -> new RuntimeException("Market " + symbol + " does not exist"));
+        String nonNullSymbol = java.util.Objects.requireNonNull(symbol);
+        Market market = repository.findById(nonNullSymbol)
+                .orElseThrow(() -> new RuntimeException("Market " + nonNullSymbol + " does not exist"));
 
         if (!market.isActive()) {
             throw new RuntimeException("Market " + symbol + " is closed");

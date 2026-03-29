@@ -5,6 +5,7 @@ export interface Market {
     symbol: string;
     type: string;
     active: boolean;
+    lastPrice?: number;
     openTime?: string;
     closeTime?: string;
 }
@@ -20,6 +21,10 @@ export const marketService = {
     },
     getSymbols: async (): Promise<Market[]> => {
         const { data } = await api.get<Market[]>("/market/symbols");
+        return data;
+    },
+    getFundamentals: async (symbol: string): Promise<any> => {
+        const { data } = await api.get(`/market/fundamentals/${symbol}`);
         return data;
     },
     getExchangeRate: async (): Promise<{ EUR: number }> => {

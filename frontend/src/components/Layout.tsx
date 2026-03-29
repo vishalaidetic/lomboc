@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/Navbar";
+import { PageLoader } from "@/components/PageLoader";
 import { Suspense } from "react";
 import { Outlet } from "react-router";
 
@@ -14,7 +15,7 @@ export function Layout() {
             <Navbar />
 
             <main className="relative z-10 flex-1">
-                <Suspense fallback={<Loading />}>
+                <Suspense fallback={<PageLoader />}>
                     <Outlet />
                 </Suspense>
             </main>
@@ -28,9 +29,3 @@ export function Layout() {
         </div>
     );
 }
-
-const Loading = () => (
-    <div className="flex flex-1 items-center justify-center p-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-    </div>
-);
