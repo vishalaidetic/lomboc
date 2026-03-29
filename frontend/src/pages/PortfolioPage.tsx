@@ -23,18 +23,25 @@ export default function PortfolioPage() {
 
     // Initial Sync
     useEffect(() => {
-        if (initialPortfolio) setPortfolio(initialPortfolio);
+        if (initialPortfolio) setPortfolio(initialPortfolio.holdings);
     }, [initialPortfolio, setPortfolio]);
 
     useEffect(() => {
         if (initialTrades) setTrades(initialTrades);
     }, [initialTrades, setTrades]);
 
-    const totalBalance = holdings.reduce((acc: number, h: any) => {
+    // Live Calculation
+    const liveStats = holdings.reduce((acc, h) => {
         const livePrice = prices[h.symbol] || h.avgPrice;
-        const valueInUSD = h.quantity * livePrice;
-        return acc + (currency === "EUR" ? valueInUSD * exchangeRate : valueInUSD);
-    }, 0);
+        const equity = livePrice * h.quantity;
+        const unrealized = (livePrice - h.avgPrice) * h.quantity;
+        const total = (h.realizedProfit || 0) + unrealized;
+
+        return {
+            wealth: acc.wealth + equity,
+            profit: acc.profit + total
+        };
+    }, { wealth: 0, profit: 0 });
 
     return (
         <div className="flex flex-col p-6 sm:p-10">
@@ -59,7 +66,7 @@ export default function PortfolioPage() {
                         </div>
                         <div className="text-3xl font-black text-white tabular-nums">
                             {currency === "EUR" ? "€" : "$"}
-                            {totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {((currency === "EUR" ? liveStats.wealth * exchangeRate : liveStats.wealth) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                         <p className="mt-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">+2.4% vs Yesterday</p>
                     </div>
@@ -71,10 +78,17 @@ export default function PortfolioPage() {
                             </div>
                             <span className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">Total Profit</span>
                         </div>
-                        <div className="text-3xl font-black text-emerald-400 tabular-nums">
-                            {currency === "EUR" ? "€" : "$"}
-                            {(totalBalance * 0.15).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
+                        {(() => {
+                            const val = currency === "EUR" ? liveStats.profit * exchangeRate : liveStats.profit;
+                            const isPositive = val >= 0;
+                            return (
+                                <div className={cn("text-3xl font-black tabular-nums", isPositive ? "text-emerald-400" : "text-rose-400")}>
+                                    {isPositive ? "+" : "-"}
+                                    {currency === "EUR" ? "€" : "$"}
+                                    {Math.abs(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                            );
+                        })()}
                         <p className="mt-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Across {holdings.length} symbols</p>
                     </div>
 
@@ -86,7 +100,7 @@ export default function PortfolioPage() {
                             <span className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">Trade Count</span>
                         </div>
                         <div className="text-3xl font-black text-white tabular-nums">
-                            {trades.length}
+                            {initialPortfolio?.tradeCount || 0}
                         </div>
                         <p className="mt-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Lifetime activity</p>
                     </div>
@@ -115,8 +129,7 @@ export default function PortfolioPage() {
                             </div>
                         ) : (
                             holdings.map((h) => {
-                                const currentPrice = prices[h.symbol] || h.avgPrice;
-                                const pnl = (currentPrice - h.avgPrice) * h.quantity;
+                                const pnl = h.unrealizedPnL;
                                 const isPositive = pnl >= 0;
 
                                 return (

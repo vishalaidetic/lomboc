@@ -1,9 +1,9 @@
 package com.trading.modules.portfolio.service;
 
-import com.trading.modules.portfolio.dto.PortfolioResponse;
-import java.util.List;
 import java.util.UUID;
 
+import com.trading.modules.portfolio.dto.PortfolioSummaryResponse;
+
 public interface PortfolioService {
-    List<PortfolioResponse> getUserPortfolio(UUID userId);
+    PortfolioSummaryResponse getUserPortfolio(UUID userId);
 }

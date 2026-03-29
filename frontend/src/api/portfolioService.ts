@@ -1,10 +1,10 @@
-import type { PortfolioResponse } from "@/types/portfolio";
+import type { PortfolioSummaryResponse } from "@/types/portfolio";
 import type { TradeResponse } from "@/types/trade";
 import { api } from "./client";
 
 export const portfolioService = {
-    getUserPortfolio: async (): Promise<PortfolioResponse[]> => {
-        const { data } = await api.get<PortfolioResponse[]>("/portfolio/me");
+    getUserPortfolio: async (): Promise<PortfolioSummaryResponse> => {
+        const { data } = await api.get<PortfolioSummaryResponse>("/portfolio/me");
         return data;
     },
 

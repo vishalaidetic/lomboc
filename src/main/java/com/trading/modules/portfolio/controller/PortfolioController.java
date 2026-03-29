@@ -1,13 +1,10 @@
 package com.trading.modules.portfolio.controller;
 
-import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trading.modules.portfolio.dto.PortfolioResponse;
 import com.trading.modules.portfolio.service.PortfolioCacheService;
 import com.trading.modules.portfolio.service.PortfolioService;
 
@@ -23,7 +20,7 @@ public class PortfolioController {
     private final com.trading.shared.service.CurrentUserService currentUserService;
 
     @GetMapping("/me")
-    public ResponseEntity<List<PortfolioResponse>> get() {
+    public ResponseEntity<com.trading.modules.portfolio.dto.PortfolioSummaryResponse> get() {
         java.util.UUID userId = currentUserService.getCurrentUserId();
         return ResponseEntity.ok(service.getUserPortfolio(userId));
     }

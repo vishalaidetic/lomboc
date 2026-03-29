@@ -33,4 +33,7 @@ public class Portfolio extends BaseEntity {
 
     @Column(name = "avg_price", precision = 19, scale = 8, nullable = false)
     private BigDecimal avgPrice;
+
+    @Column(name = "realized_profit", precision = 19, scale = 8, nullable = false)
+    private BigDecimal realizedProfit = BigDecimal.ZERO;
 }

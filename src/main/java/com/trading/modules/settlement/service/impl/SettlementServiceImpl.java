@@ -70,7 +70,7 @@ public class SettlementServiceImpl implements SettlementService {
 
         int oldQty = p.getQuantity();
 
-        // CASE A: Opening or Increasing a Position
+        // CASE A: Opening or Increasing a Position (Average cost changes)
         if ((oldQty >= 0 && newTotalQty > oldQty) || (oldQty <= 0 && newTotalQty < oldQty)) {
             BigDecimal oldAbsQty = BigDecimal.valueOf(Math.abs(oldQty));
             BigDecimal tradeAbsQty = BigDecimal.valueOf(Math.abs(qtyChange));
@@ -81,10 +81,26 @@ public class SettlementServiceImpl implements SettlementService {
 
             p.setAvgPrice(currentVal.add(newVal).divide(newAbsQty, 8, RoundingMode.HALF_UP));
         }
-        // CASE B: Fully Flipped Position
+        // CASE B: Fully Flipped Position (Calculate profit on closed side, then reset
+        // basis)
         else if ((oldQty > 0 && newTotalQty < 0) || (oldQty < 0 && newTotalQty > 0)) {
+            // Profit = (Exit Price - Entry Price) * Quantity Closed
+            BigDecimal qtyClosed = BigDecimal.valueOf(Math.abs(oldQty));
+            BigDecimal profit = (oldQty > 0)
+                    ? tracePrice.subtract(p.getAvgPrice()).multiply(qtyClosed) // Long-side profit
+                    : p.getAvgPrice().subtract(tracePrice).multiply(qtyClosed); // Short-side profit
+
+            p.setRealizedProfit(p.getRealizedProfit().add(profit));
             p.setAvgPrice(tracePrice);
         }
-        // CASE C: Reducing Position (Basis doesn't change)
+        // CASE C: Reducing Position (Basis doesn't change, realized profit recorded)
+        else {
+            BigDecimal qtyReduced = BigDecimal.valueOf(Math.abs(qtyChange));
+            BigDecimal profit = (oldQty > 0)
+                    ? tracePrice.subtract(p.getAvgPrice()).multiply(qtyReduced) // Long reduction
+                    : p.getAvgPrice().subtract(tracePrice).multiply(qtyReduced); // Short reduction
+
+            p.setRealizedProfit(p.getRealizedProfit().add(profit));
+        }
     }
 }
