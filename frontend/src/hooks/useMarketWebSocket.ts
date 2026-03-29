@@ -13,103 +13,117 @@ export function useMarketWebSocket() {
     const [latency, setLatency] = useState<number>(0);
     const pingSentTimeRef = useRef<number>(0);
 
-    // Selectors
-    const { currentSymbol, updatePrice } = useMarketStore();
-    const addTrade = usePortfolioStore((state) => state.addTrade);
-    const handleOrderTrade = useOrderStore((state) => state.handleTradeEvent);
-    const { userId } = useAuthStore();
+    // Stably selected actions/state
+    const currentSymbol = useMarketStore(s => s.currentSymbol);
+    const updatePrice = useMarketStore(s => s.updatePrice);
+    const addTrade = usePortfolioStore(s => s.addTrade);
+    const handleOrderTrade = useOrderStore(s => s.handleTradeEvent);
+    const userId = useAuthStore(s => s.userId);
     const queryClient = useQueryClient();
+
+    // Use refs for stable access to actions inside the effect
+    const actionsRef = useRef({ updatePrice, addTrade, handleOrderTrade, userId });
+    useEffect(() => {
+        actionsRef.current = { updatePrice, addTrade, handleOrderTrade, userId };
+    }, [updatePrice, addTrade, handleOrderTrade, userId]);
 
     useEffect(() => {
         let reconnectTimeout: ReturnType<typeof setTimeout>;
         let heartbeatInterval: ReturnType<typeof setInterval>;
+        let isActive = true;
 
         const connect = () => {
+            if (!isActive) return;
+
+            console.log(`[WS] Attempting connection to ${WS_URL} for symbol: ${currentSymbol}`);
             const socket = new WebSocket(WS_URL);
+            socketRef.current = socket;
 
             socket.onopen = () => {
+                if (!isActive) {
+                    socket.close();
+                    return;
+                }
+                console.log(`[WS] Connected to market: ${currentSymbol}`);
                 setIsConnected(true);
                 if (currentSymbol) {
                     socket.send(JSON.stringify({ type: "SUBSCRIBE", symbol: currentSymbol }));
                 }
 
-                // Start Latency Heartbeat
                 heartbeatInterval = setInterval(() => {
                     if (socket.readyState === WebSocket.OPEN) {
                         pingSentTimeRef.current = Date.now();
                         socket.send(JSON.stringify({ type: "PING" }));
                     }
-                }, 5000);
+                }, 10000); // 10s heartbeat
             };
 
             socket.onmessage = (event) => {
+                if (!isActive) return;
                 try {
                     const data = JSON.parse(event.data);
+                    const { updatePrice: up, addTrade: at, handleOrderTrade: hot } = actionsRef.current;
 
                     if (data.type === "PONG") {
-                        const rtt = Date.now() - pingSentTimeRef.current;
-                        setLatency(rtt);
+                        setLatency(Date.now() - pingSentTimeRef.current);
                         return;
                     }
 
-                    const isSimulationMode = useMarketStore.getState().isSimulationMode;
-                    const simulationSessionId = useMarketStore.getState().simulationSessionId;
-
+                    const state = useMarketStore.getState();
                     if (data.symbol && data.price) {
-                        const tickSessionId = data.sessionId || null;
-                        const isMatch = isSimulationMode
-                            ? (tickSessionId === simulationSessionId)
-                            : (tickSessionId === null);
+                        const isMatch = state.isSimulationMode
+                            ? (data.sessionId === state.simulationSessionId)
+                            : (!data.sessionId);
 
-                        if (isMatch) {
-                            updatePrice(data.symbol, data.price);
-                        }
+                        if (isMatch) up(data.symbol, data.price);
                     }
 
                     if (data.tradeId || (data.buyUserId && data.sellUserId)) {
-                        const isRelevant = data.buyUserId === userId || data.sellUserId === userId;
-                        if (isRelevant) {
-                            handleOrderTrade(data, userId);
-                            queryClient.invalidateQueries({ queryKey: ["portfolio", userId] });
-                            addTrade({
+                        const uid = actionsRef.current.userId;
+                        if (data.buyUserId === uid || data.sellUserId === uid) {
+                            hot(data, uid || "");
+                            queryClient.invalidateQueries({ queryKey: ["portfolio", uid] });
+                            at({
                                 id: data.tradeId || Math.random().toString(),
-                                buyOrderId: data.buyOrderId,
-                                buyUserId: data.buyUserId,
-                                sellOrderId: data.sellOrderId,
-                                sellUserId: data.sellUserId,
-                                symbol: data.symbol,
-                                price: data.price,
-                                quantity: data.quantity,
+                                ...data,
                                 executedAt: data.executedAt || new Date().toISOString()
                             });
                         }
                     }
                 } catch (error) {
-                    console.error("WS Parse Error", error);
+                    console.error("[WS] Parse Error", error);
                 }
             };
 
             socket.onclose = () => {
                 setIsConnected(false);
                 clearInterval(heartbeatInterval);
-                reconnectTimeout = setTimeout(connect, 3000);
+                if (isActive) {
+                    reconnectTimeout = setTimeout(connect, 3000);
+                }
             };
 
             socket.onerror = (error) => {
-                socket.close();
+                console.error("[WS] Connection Error", error);
             };
-
-            socketRef.current = socket;
         };
 
-        connect();
+        // Delay the first connection slightly to let the component settle
+        reconnectTimeout = setTimeout(connect, 100);
 
         return () => {
-            if (socketRef.current) socketRef.current.close();
+            isActive = false;
+            console.log("[WS] Cleaning up connection");
+            if (socketRef.current) {
+                if (socketRef.current.readyState === WebSocket.CONNECTING || socketRef.current.readyState === WebSocket.OPEN) {
+                    socketRef.current.close();
+                }
+                socketRef.current = null;
+            }
             clearTimeout(reconnectTimeout);
             clearInterval(heartbeatInterval);
         };
-    }, [updatePrice, currentSymbol, userId]);
+    }, [currentSymbol, userId, queryClient]); // Only reconnect if the symbol or user identification changes.
 
     return { isConnected, latency };
 }

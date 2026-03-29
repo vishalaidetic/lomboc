@@ -18,7 +18,6 @@ export function OrderForm({ symbol }: OrderFormProps) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         mutation.mutate({
-            userId: "00000000-0000-0000-0000-000000000000", // Placeholder user
             symbol,
             type: OrderType.LIMIT,
             side,

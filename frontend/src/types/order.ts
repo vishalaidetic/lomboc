@@ -20,7 +20,7 @@ export const OrderStatus = {
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
 export interface CreateOrderRequest {
-    userId: string;
+    userId?: string;
     symbol: string;
     type: OrderType;
     side: OrderSide;

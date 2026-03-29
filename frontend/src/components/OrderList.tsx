@@ -8,12 +8,10 @@ import { useEffect } from "react";
 
 export function OrderList() {
     const { orders, setOrders } = useOrderStore();
-    const PLACEHOLDER_USER_ID = "00000000-0000-0000-0000-000000000000";
-
     const { data: initialOrders } = useQuery({
-        queryKey: ["orders", PLACEHOLDER_USER_ID],
-        queryFn: () => orderService.getOrdersByUserId(PLACEHOLDER_USER_ID),
-        refetchInterval: 3000, // Poll for status updates
+        queryKey: ["orders", "me"],
+        queryFn: () => orderService.getOrdersByUser(),
+        refetchInterval: 3000,
     });
 
     useEffect(() => {

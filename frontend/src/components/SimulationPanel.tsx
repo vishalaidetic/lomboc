@@ -4,11 +4,10 @@ import { History, Pause, Play, StopCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface SimulationPanelProps {
-    userId: string;
     symbol: string;
 }
 
-export function SimulationPanel({ userId, symbol }: SimulationPanelProps) {
+export function SimulationPanel({ symbol }: SimulationPanelProps) {
     const [activeSession, setActiveSession] = useState<ReplaySession | null>(null);
     const [currentTime, setCurrentTime] = useState<number>(0);
     const timelineRef = useRef<HTMLInputElement>(null);
@@ -26,7 +25,7 @@ export function SimulationPanel({ userId, symbol }: SimulationPanelProps) {
 
     const handleStart = async (speed: number = 1.0) => {
         const oneHourAgo = Date.now() - (3600 * 1000);
-        const session = await replayService.start(userId, symbol, oneHourAgo, speed);
+        const session = await replayService.start(symbol, oneHourAgo, speed);
         setActiveSession(session);
         setCurrentTime(oneHourAgo);
     };

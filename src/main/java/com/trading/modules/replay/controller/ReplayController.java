@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.trading.modules.replay.model.ReplaySession;
 import com.trading.modules.replay.service.ReplayService;
 
 import lombok.RequiredArgsConstructor;
@@ -20,13 +19,16 @@ import lombok.RequiredArgsConstructor;
 public class ReplayController {
 
     private final ReplayService service;
+    private final com.trading.shared.service.CurrentUserService currentUserService;
 
     @PostMapping("/start")
-    public ReplaySession start(
-            @RequestParam String userId,
+    public com.trading.modules.replay.model.ReplaySession start(
             @RequestParam String symbol,
             @RequestParam(defaultValue = "1640995200000") long startTime,
             @RequestParam(defaultValue = "1.0") double speed) {
+
+        String userId = currentUserService.getCurrentUserId().toString();
+
         return service.start(userId, symbol, startTime, speed);
     }
 

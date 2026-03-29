@@ -14,7 +14,6 @@ import lombok.Data;
 
 @Data
 public class CreateOrderRequest {
-    @NotNull(message = "User ID is required")
     private UUID userId;
     @NotBlank(message = "Symbol is required")
     private String symbol;

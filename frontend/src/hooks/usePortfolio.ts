@@ -1,20 +1,19 @@
 import { portfolioService } from "@/api/portfolioService";
 import { useQuery } from "@tanstack/react-query";
 
-export function usePortfolio(userId: string) {
+export function usePortfolio() {
     return useQuery({
-        queryKey: ["portfolio", userId],
-        queryFn: () => portfolioService.getUserPortfolio(userId),
-        enabled: !!userId,
-        refetchInterval: 3000, // Poll every 3 seconds for settlements
+        queryKey: ["portfolio", "me"],
+        queryFn: () => portfolioService.getUserPortfolio(),
+        refetchInterval: 3000,
         staleTime: 0,
     });
 }
 
-export function useRecentTrades(userId?: string) {
+export function useRecentTrades() {
     return useQuery({
-        queryKey: ["trades", "recent", userId],
-        queryFn: () => portfolioService.getRecentTrades(userId),
-        refetchInterval: 5000, // Sync trade log every 5 seconds
+        queryKey: ["trades", "me"],
+        queryFn: () => portfolioService.getRecentTrades(),
+        refetchInterval: 5000,
     });
 }

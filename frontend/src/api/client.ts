@@ -8,11 +8,27 @@ export const api = axios.create({
     },
 });
 
+let authToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+    authToken = token;
+};
+
+// Request interceptor for auth
+api.interceptors.request.use((config) => {
+    if (authToken) {
+        config.headers.Authorization = `Bearer ${authToken}`;
+    }
+    return config;
+});
+
 // Response interceptor for error handling
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        console.error("API connection error:", error.message);
+        if (error.response?.status === 401) {
+            console.error("Unauthorized - User session might be expired");
+        }
         return Promise.reject(error);
     }
 );

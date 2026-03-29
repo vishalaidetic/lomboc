@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE = 'http://localhost:8081/replay';
+import { api } from './client';
 
 export interface ReplaySession {
     id: string;
@@ -14,34 +12,33 @@ export interface ReplaySession {
 }
 
 export const replayService = {
-    start: async (userId: string, symbol: string, startTime: number, speed: number = 1.0): Promise<ReplaySession> => {
-        const response = await axios.post(`${API_BASE}/start`, null, {
-            params: { userId, symbol, startTime, speed }
+    start: async (symbol: string, startTime: number, speed: number = 1.0): Promise<ReplaySession> => {
+        const { data } = await api.post<ReplaySession>(`/replay/start`, null, {
+            params: { symbol, startTime, speed }
         });
-        return response.data;
+        return data;
     },
 
     pause: async (sessionId: string) => {
-        await axios.post(`${API_BASE}/pause/${sessionId}`);
+        await api.post(`/replay/pause/${sessionId}`);
     },
 
     resume: async (sessionId: string) => {
-        await axios.post(`${API_BASE}/resume/${sessionId}`);
+        await api.post(`/replay/resume/${sessionId}`);
     },
 
     stop: async (sessionId: string) => {
-        await axios.delete(`${API_BASE}/${sessionId}`);
+        await api.delete(`/replay/stop/${sessionId}`);
     },
 
     seek: async (sessionId: string, timestamp: number) => {
-        // Backend needs to support this - adding it now
-        await axios.post(`${API_BASE}/seek/${sessionId}`, null, {
+        await api.post(`/replay/seek/${sessionId}`, null, {
             params: { timestamp }
         });
     },
 
     setSpeed: async (sessionId: string, speed: number) => {
-        await axios.post(`${API_BASE}/speed/${sessionId}`, null, {
+        await api.post(`/replay/speed/${sessionId}`, null, {
             params: { speed }
         });
     }

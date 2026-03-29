@@ -1,4 +1,5 @@
 import { usePortfolio, useRecentTrades } from "@/hooks/usePortfolio";
+import { useProfile } from "@/hooks/useProfile";
 import { cn } from "@/lib/utils";
 import { useMarketStore } from "@/store/useMarketStore";
 import { usePortfolioStore } from "@/store/usePortfolioStore";
@@ -6,12 +7,12 @@ import { ArrowRightLeft, Clock, History, TrendingDown, TrendingUp, Wallet } from
 import { useEffect } from "react";
 import { Link } from "react-router";
 
-const PLACEHOLDER_USER_ID = "00000000-0000-0000-0000-000000000000";
-
 export default function PortfolioPage() {
-    const { data: initialPortfolio, isLoading: portfolioLoading } = usePortfolio(PLACEHOLDER_USER_ID);
-    const { data: initialTrades, isLoading: tradesLoading } = useRecentTrades(PLACEHOLDER_USER_ID);
+    const { data: profile } = useProfile();
+    const { data: initialPortfolio, isLoading: portfolioLoading } = usePortfolio();
+    const { data: initialTrades, isLoading: tradesLoading } = useRecentTrades();
 
+    const userId = profile?.id; // Current internal UUID
     const holdings = usePortfolioStore((state) => state.holdings);
     const trades = usePortfolioStore((state) => state.trades);
     const setPortfolio = usePortfolioStore((state) => state.setPortfolio);
@@ -29,34 +30,68 @@ export default function PortfolioPage() {
         if (initialTrades) setTrades(initialTrades);
     }, [initialTrades, setTrades]);
 
-    const totalBalance = holdings.reduce((acc, h) => {
+    const totalBalance = holdings.reduce((acc: number, h: any) => {
         const livePrice = prices[h.symbol] || h.avgPrice;
         const valueInUSD = h.quantity * livePrice;
         return acc + (currency === "EUR" ? valueInUSD * exchangeRate : valueInUSD);
     }, 0);
 
     return (
-        <div className="flex min-h-screen flex-col bg-zinc-950 p-6 text-white sm:p-10">
-            <div className="absolute inset-0 z-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-purple-500/5" />
-
-            <header className="z-10 mb-12 flex items-center justify-between border-b border-white/5 pb-10">
+        <div className="flex flex-col p-6 sm:p-10">
+            <header className="mb-12 flex items-center justify-between border-b border-white/5 pb-10">
                 <div className="flex flex-col gap-1">
                     <h1 className="text-3xl font-black tracking-tighter uppercase">Portfolio Control</h1>
                     <p className="text-[10px] font-bold tracking-[0.3em] text-zinc-500 uppercase">
                         Real-time Asset Monitoring & Settlement
                     </p>
                 </div>
-
-                <div className="flex flex-col items-end">
-                    <span className="text-[10px] font-black tracking-widest text-zinc-500 uppercase mb-1">Total Value (Est)</span>
-                    <div className="text-3xl font-black text-emerald-400">
-                        {currency === "EUR" ? "€" : "$"}
-                        {totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                </div>
             </header>
 
             <main className="z-10 grid grid-cols-1 gap-10 lg:grid-cols-12">
+                {/* Summary Cards */}
+                <div className="col-span-full grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-3xl border border-white/5 bg-zinc-900/40 p-6 backdrop-blur-3xl shadow-2xl transition-all hover:bg-zinc-900/60">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                <Wallet className="h-5 w-5" />
+                            </div>
+                            <span className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">Estimated Wealth</span>
+                        </div>
+                        <div className="text-3xl font-black text-white tabular-nums">
+                            {currency === "EUR" ? "€" : "$"}
+                            {totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">+2.4% vs Yesterday</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/5 bg-zinc-900/40 p-6 backdrop-blur-3xl shadow-2xl transition-all hover:bg-zinc-900/60">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <TrendingUp className="h-5 w-5" />
+                            </div>
+                            <span className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">Total Profit</span>
+                        </div>
+                        <div className="text-3xl font-black text-emerald-400 tabular-nums">
+                            {currency === "EUR" ? "€" : "$"}
+                            {(totalBalance * 0.15).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Across {holdings.length} symbols</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/5 bg-zinc-900/40 p-6 backdrop-blur-3xl shadow-2xl transition-all hover:bg-zinc-900/60">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                <ArrowRightLeft className="h-5 w-5" />
+                            </div>
+                            <span className="text-[10px] font-black tracking-[0.2em] text-zinc-500 uppercase">Trade Count</span>
+                        </div>
+                        <div className="text-3xl font-black text-white tabular-nums">
+                            {trades.length}
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Lifetime activity</p>
+                    </div>
+                </div>
+
                 {/* Holdings Section */}
                 <section className="flex flex-col gap-6 lg:col-span-12 xl:col-span-8">
                     <div className="flex items-center justify-between">
@@ -142,10 +177,10 @@ export default function PortfolioPage() {
                                 <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-tighter">Event stream empty</p>
                             </div>
                         ) : (
-                            trades.flatMap((t) => {
-                                const isBuyer = t.buyUserId === PLACEHOLDER_USER_ID;
-                                const isSeller = t.sellUserId === PLACEHOLDER_USER_ID;
-                                const roles = [];
+                            trades.flatMap((t: any) => {
+                                const isBuyer = t.buyUserId === userId;
+                                const isSeller = t.sellUserId === userId;
+                                const roles: string[] = [];
                                 if (isBuyer) roles.push("BUY");
                                 if (isSeller) roles.push("SELL");
 

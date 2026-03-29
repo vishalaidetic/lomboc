@@ -49,15 +49,15 @@ export default function TradePage() {
     const { data: latestPrice } = useQuery({
         queryKey: ["price", symbol],
         queryFn: () => marketService.getLatestPrice(symbol),
-        refetchInterval: 100,
-        enabled: isConnected,
+        refetchInterval: 1000,
+        enabled: !!symbol,
     });
 
     const { data: bookData } = useQuery({
         queryKey: ["orderbook", symbol],
         queryFn: () => marketService.getOrderBook(symbol),
-        refetchInterval: 500,
-        enabled: isConnected,
+        refetchInterval: 1000,
+        enabled: !!symbol,
     });
 
     // BATCHER: UI Frame Sync Logic
@@ -217,7 +217,7 @@ export default function TradePage() {
             </main>
 
             {/* Simulation Time Master Bar */}
-            <SimulationPanel userId={"00000000-0000-0000-0000-000000000000"} symbol={symbol} />
+            <SimulationPanel symbol={symbol} />
         </div>
     );
 }

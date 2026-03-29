@@ -1,53 +1,96 @@
+import { Layout } from "@/components/Layout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 
 // Lazy routes
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const TradePage = lazy(() => import("@/pages/TradePage"));
 const PortfolioPage = lazy(() => import("@/pages/PortfolioPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
-const Loading = () => (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-    </div>
-);
-
 const router = createBrowserRouter([
+    // ─── Public Route ─────────────────────────────────────────────
     {
-        path: "/",
+        path: "/login",
         element: (
-            <Suspense fallback={<Loading />}>
-                <HomePage />
+            <Suspense fallback={<PageLoader />}>
+                <LoginPage />
             </Suspense>
         ),
     },
+
+    // ─── Protected Routes (ProtectedRoute → Layout → Pages) ───────
     {
-        path: "/trade/:symbol",
-        element: (
-            <Suspense fallback={<Loading />}>
-                <TradePage />
-            </Suspense>
-        ),
-    },
-    {
-        path: "/portfolio",
-        element: (
-            <Suspense fallback={<Loading />}>
-                <PortfolioPage />
-            </Suspense>
-        ),
-    },
-    {
-        path: "*",
-        element: (
-            <Suspense fallback={<Loading />}>
-                <NotFoundPage />
-            </Suspense>
-        ),
+        element: <ProtectedRoute />,      // checks auth, renders <Outlet />
+        children: [
+            {
+                element: <Layout />,      // Navbar + footer shell, renders <Outlet />
+                children: [
+                    {
+                        path: "/",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <HomePage />
+                            </Suspense>
+                        ),
+                    },
+                    {
+                        path: "/trade/:symbol",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <TradePage />
+                            </Suspense>
+                        ),
+                    },
+                    {
+                        path: "/portfolio",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <PortfolioPage />
+                            </Suspense>
+                        ),
+                    },
+                    {
+                        path: "*",
+                        element: (
+                            <Suspense fallback={<PageLoader />}>
+                                <NotFoundPage />
+                            </Suspense>
+                        ),
+                    },
+                ],
+            },
+        ],
     },
 ]);
 
 export function AppRouter() {
     return <RouterProvider router={router} />;
+}
+
+function PageLoader() {
+    return (
+        <div
+            style={{
+                display: "flex",
+                minHeight: "100vh",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#09090b",
+            }}
+        >
+            <div
+                style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(255,255,255,0.1)",
+                    borderTop: "2px solid #3b82f6",
+                    animation: "spin 0.8s linear infinite",
+                }}
+            />
+        </div>
+    );
 }

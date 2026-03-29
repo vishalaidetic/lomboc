@@ -22,7 +22,7 @@ export function useOrderMutation() {
             const tempId = `temp-${Date.now()}`;
             const optimisticOrder: OrderResponse = {
                 id: tempId,
-                userId: newOrderRequest.userId,
+                userId: newOrderRequest.userId || "",
                 symbol: newOrderRequest.symbol,
                 type: newOrderRequest.type,
                 side: newOrderRequest.side,

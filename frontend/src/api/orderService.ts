@@ -7,8 +7,8 @@ export const orderService = {
         return data;
     },
 
-    getOrdersByUserId: async (userId: string): Promise<OrderResponse[]> => {
-        const { data } = await api.get<OrderResponse[]>(`/orders/user/${userId}`);
+    getOrdersByUser: async (): Promise<OrderResponse[]> => {
+        const { data } = await api.get<OrderResponse[]>("/orders/me");
         return data;
     },
 };
